@@ -150,6 +150,8 @@ func startGoroutines(connection *Connection) {
 	// receive goroutine
 	go func() {
 		for !connection.IsClosing() {
+			// receive的作用是从conn里面接收package，然后调用handler[根据它的channlid处理]（tick处理），handler最后是调用发送到connection的sendQueue
+			// sendQeueue是在下面的flust里面处理
 			connection.receive()
 		}
 	}()
@@ -190,6 +192,7 @@ func StartListening(t channeldpb.ConnectionType, network string, address string)
 	defer listener.Close()
 
 	for {
+		// 等待请求到来
 		conn, err := listener.Accept()
 		if err != nil {
 			rootLogger.Error("failed to accept connection", zap.Error(err))
@@ -255,6 +258,7 @@ func AddConnection(c net.Conn, t channeldpb.ConnectionType) *Connection {
 	maxConnId := uint32(1)<<GlobalSettings.MaxConnectionIdBits - 1
 
 	for tries := 0; ; tries++ {
+		// 生成ConnId，如果冲突了的话，就重试
 		generateNextConnId(c, maxConnId)
 		if _, exists := allConnections.Load(ConnectionId(nextConnectionId)); !exists {
 			break
@@ -394,6 +398,7 @@ func (c *Connection) receive() {
 
 	bufPos := 0
 	for bufPos = 0; bufPos < c.readPos; {
+		// 开始处理读取到的内容
 		packet, err := c.readPacket(&bufPos)
 		// there's a wire format error, close the connection to give a quick feedback to the other end.
 		if err != nil {
@@ -502,6 +507,8 @@ func (c *Connection) readPacket(bufPos *int) (*channeldpb.Packet, error) {
 		c.recordPacket(&p)
 	}
 
+	// 上面把package给解析出来了，然后就通过下面的进行处理，处理就是发送到channld的inMsgQueue
+	// inMsgQueue是在Tick的tickmessage里面厘做处理的
 	for _, mp := range p.Messages {
 		c.receiveMessage(mp)
 	}
@@ -515,6 +522,7 @@ func (c *Connection) isPacketRecordingEnabled() bool {
 }
 
 func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
+	// todo： channel是做什么的
 	channel := GetChannel(common.ChannelId(mp.ChannelId))
 	if channel == nil {
 		c.Logger().Warn("can't find channel",
@@ -540,6 +548,7 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 	}
 
 	var msg common.Message
+	// 具体的处理函数
 	var handler MessageHandlerFunc
 	if mp.MsgType >= uint32(channeldpb.MessageType_USER_SPACE_START) && entry == nil {
 		// client -> channeld -> server
@@ -568,8 +577,10 @@ func (c *Connection) receiveMessage(mp *channeldpb.MessagePack) {
 		}
 	}
 
+	// todo: 这个fsm是做什么的
 	c.fsm.OnReceived(mp.MsgType)
 
+	// 发送到inMsgQueue
 	channel.PutMessage(msg, handler, c, mp)
 
 	c.Logger().VeryVerbose("received message", zap.Uint32("msgType", mp.MsgType), zap.Int("size", len(mp.MsgBody)))

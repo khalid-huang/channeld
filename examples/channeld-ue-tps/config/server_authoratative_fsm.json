@@ -1,0 +1,16 @@
+{
+    "States": [
+        {
+            "Name": "INIT",
+            "MsgTypeWhitelist": "1",
+            "MsgTypeBlacklist": ""
+        },
+        {
+            "Name": "OPEN",
+            "MsgTypeWhitelist": "2-65535",
+            "MsgTypeBlacklist": ""
+        }
+    ],
+    "Transitions": [
+    ]
+}

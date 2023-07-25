@@ -60,6 +60,7 @@ type ConnectionInChannel interface {
 	RemoteAddr() net.Addr
 }
 
+// 可以看subscriptions_test.go知道connection可以订阅channel（是多对多的关系）
 type Channel struct {
 	id                    common.ChannelId
 	channelType           channeldpb.ChannelType
@@ -100,6 +101,7 @@ var spatialChannelFull bool = false
 var allChannels *xsync.MapOf[common.ChannelId, *Channel]
 var globalChannel *Channel
 
+// todo：一般零号channlid是谁，就是channelType_Global，也就是114行这里
 func InitChannels() {
 	if allChannels != nil {
 		return
@@ -379,6 +381,8 @@ func (ch *Channel) tickMessages(tickStart time.Time) {
 			ch.Logger().Warn("drops message as the sender is lost", zap.Uint32("msgType", uint32(cm.ctx.MsgType)))
 			continue
 		}
+		// 这个handle的处理分为server和client,具体的实现在  D:\workspace\gocode\channeld-release\pkg\channeld\message.go
+		// func handleClientToServerUserMessage(ctx MessageContext) 和 handleServerxxxx
 		cm.handler(cm.ctx)
 		if ch.tickInterval > 0 && time.Since(tickStart) >= ch.tickInterval {
 			ch.Logger().Warn("spent too long handling messages, will delay the left to the next tick",
@@ -449,6 +453,7 @@ func (ch *Channel) Broadcast(ctx MessageContext) {
 	}()
 	ch.connectionsLock.RLock()
 
+	// 给订阅这个通道的所有连接执行转发
 	for conn := range ch.subscribedConnections {
 		//c := GetConnection(connId)
 		if conn == nil {

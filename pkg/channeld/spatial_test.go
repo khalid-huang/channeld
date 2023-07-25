@@ -49,6 +49,7 @@ func TestConeAOI(t *testing.T) {
 
 	result, err := ctl1.QueryChannelIds(query1)
 	assert.NoError(t, err)
+	// GlobalSettings.SpatialChanneldstart为65535
 	assert.Contains(t, result, common.ChannelId(65536))
 
 	// 4-by-1-grid world

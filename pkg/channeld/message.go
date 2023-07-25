@@ -61,6 +61,7 @@ func RegisterMessageHandler(msgType uint32, msg common.Message, handler MessageH
 	MessageMap[channeldpb.MessageType(msgType)] = &messageMapEntry{msg, handler}
 }
 
+// package到这里会处理
 func handleClientToServerUserMessage(ctx MessageContext) {
 	msg, ok := ctx.Msg.(*channeldpb.ServerForwardMessage)
 	if !ok {
@@ -119,6 +120,11 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 		return
 	}
 
+	// todo 收到比较多的是： {"connType": "SERVER", "connId": 1, "msgType": 100, "clientConnId": 3, "channelId": 0, "broadcastType": 1, "payloadSize": 142}
+	// channeId 为0就是channelpb.channelType_Gobal类型的，
+	// msgType: 100/103, 这个type在: D:\workspace\gocode\channeld-release\pkg\channeldpb\channeld.pb.go
+	// 这个type在：D:\workspace\gocode\channeld-release\pkg\unrealpb\unreal_common.pb.go，也有定义
+	// 100: MessageType_USER_SPACE_START
 	if len(msg.Payload) < 128 {
 		ctx.Connection.Logger().Verbose("forward user-space message from server to client/server",
 			zap.Uint32("msgType", uint32(ctx.MsgType)),
@@ -138,6 +144,7 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 
 	}
 
+	// 有啥区别这些广播类型
 	switch channeldpb.BroadcastType(ctx.Broadcast) {
 	case channeldpb.BroadcastType_NO_BROADCAST:
 		if ctx.Channel.HasOwner() {
@@ -176,6 +183,9 @@ func HandleServerToClientUserMessage(ctx MessageContext) {
 			)
 		}
 
+		//这里要转发的最后会调用 D:\workspace\gocode\channeld-release\pkg\channeld\connection.go 的Send
+		// 会通过proto.Marshal把ctx.Msg给序列化，然后作为body封装到messagepack的MsgBody厘米按，然后通过connection的sendQeueu发送
+		// 而这个的sendQeueu的处理实在Connection的flust里面做处理的
 	default:
 		if ctx.Broadcast >= uint32(channeldpb.BroadcastType_ALL) && ctx.Broadcast < uint32(channeldpb.BroadcastType_ADJACENT_CHANNELS) {
 			ctx.Channel.Broadcast(ctx)

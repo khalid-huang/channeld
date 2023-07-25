@@ -4,7 +4,7 @@ COPY . /channeld
 
 WORKDIR /channeld
 
-ENV GOPROXY="https://goproxy.io"
+ENV GOPROXY="https://goproxy.cn,directe"
 RUN go get -d -v ./...
 RUN go install -v ./...
 RUN go build -o app ./cmd
